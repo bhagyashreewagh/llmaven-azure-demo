@@ -1,0 +1,4 @@
+config:
+  azure-native:location: westus2
+  llmaven-azure-demo:llmaven_url: ""        # Set this to eScience's LLMaven URL when you have it
+  llmaven-azure-demo:llmaven_api_key: ""    # Set this to eScience's master key when you have it
