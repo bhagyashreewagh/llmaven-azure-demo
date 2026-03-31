@@ -1,0 +1,3 @@
+name: llmaven-azure-demo
+runtime: python
+description: LLMaven Azure data pipeline — ingestion, storage, and dashboard
