@@ -8,27 +8,27 @@ A lightweight Azure data pipeline that extracts AI usage logs from [LLMaven](htt
 
 ```
 LLMaven Server (LiteLLM + PostgreSQL)
-        │
-        ▼  daily at midnight
-┌─────────────────────────────────────────┐
-│  Azure Function (Ingestion + Processing) │
-│  • calls llmaven extract → JSONL         │
-│  • cleans JSONL → Parquet with pandas    │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│  Azure Data Lake Storage Gen2            │
-│  raw/YYYY/MM/DD/logs.jsonl               │
-│  clean/YYYY/MM/DD/clean.parquet          │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│  Streamlit Dashboard (Container Apps)    │
-│  • model usage, cost, tokens, sessions  │
-│  • filter by source (Claude-Code, etc.) │
-└─────────────────────────────────────────┘
+        |
+        v  daily at midnight
++------------------------------------------+
+|  Azure Function (Ingestion + Processing) |
+|  - calls llmaven extract -> JSONL        |
+|  - cleans JSONL -> Parquet with pandas   |
++------------------+-----------------------+
+                   |
+                   v
++------------------------------------------+
+|  Azure Data Lake Storage Gen2            |
+|  raw/YYYY/MM/DD/logs.jsonl               |
+|  clean/YYYY/MM/DD/clean.parquet          |
++------------------+-----------------------+
+                   |
+                   v
++------------------------------------------+
+|  Streamlit Dashboard (Container Apps)    |
+|  - model usage, cost, tokens, sessions  |
+|  - filter by source, turns, model       |
++------------------------------------------+
 ```
 
 ---
@@ -36,27 +36,27 @@ LLMaven Server (LiteLLM + PostgreSQL)
 ## Repo Structure
 
 ```
-├── pulumi/                     # Infrastructure as Code (Pulumi Python)
-│   ├── __main__.py             # All Azure resources defined here
-│   ├── Pulumi.yaml
-│   ├── Pulumi.dev.yaml         # Stack config (location, LLMaven URL/key)
-│   └── requirements.txt
-│
-├── function_app/               # Azure Function — daily pipeline
-│   ├── extract_pipeline/
-│   │   └── __init__.py         # Timer trigger: extract → clean → upload
-│   ├── host.json
-│   └── requirements.txt
-│
-├── dashboard/                  # Streamlit dashboard
-│   ├── app.py                  # All charts + filtering
-│   ├── Dockerfile
-│   └── requirements.txt
-│
-├── test-extract-output/        # Sample JSONL from local LLMaven run
-│   └── litellm_spend_logs_*.jsonl
-│
-└── azure_pipeline_resources.md # Resource comparison + cost estimates
+|- pulumi/                     # Infrastructure as Code (Pulumi Python)
+|   |- __main__.py             # All Azure resources defined here
+|   |- Pulumi.yaml
+|   |- Pulumi.dev.yaml         # Stack config (location, LLMaven URL/key)
+|   +- requirements.txt
+|
+|- function_app/               # Azure Function - daily pipeline
+|   |- extract_pipeline/
+|   |   +- __init__.py         # Timer trigger: extract -> clean -> upload
+|   |- host.json
+|   +- requirements.txt
+|
+|- dashboard/                  # Streamlit dashboard
+|   |- app.py                  # All charts + filtering
+|   |- Dockerfile
+|   +- requirements.txt
+|
+|- test-extract-output/        # Sample JSONL from local LLMaven run
+|   +- litellm_spend_logs_*.jsonl
+|
++- azure_pipeline_resources.md # Resource comparison + cost estimates
 ```
 
 ---
@@ -70,7 +70,7 @@ LLMaven Server (LiteLLM + PostgreSQL)
 | Clean Storage | ADLS Gen2 (Parquet) | 85% smaller than CSV, 10x faster queries |
 | Dashboard | Azure Container Apps (scale-to-zero) | Free when idle, shareable URL |
 
-**Estimated monthly cost: ~$2–5/month**
+**Estimated monthly cost: ~$2-5/month**
 
 See [azure_pipeline_resources.md](./azure_pipeline_resources.md) for full resource comparison and alternatives considered.
 
@@ -90,8 +90,8 @@ cd pulumi
 pip install -r requirements.txt
 pulumi stack init dev
 pulumi config set azure-native:location westus2
-pulumi config set llmaven_url "https://your-llmaven-server"      # from Layomi
-pulumi config set --secret llmaven_api_key "sk-your-key"          # from Layomi
+pulumi config set llmaven_url "https://your-llmaven-server"
+pulumi config set --secret llmaven_api_key "sk-your-key"
 pulumi up
 ```
 
@@ -103,7 +103,7 @@ docker build -t ghcr.io/<your-username>/llmaven-dashboard:latest .
 docker push ghcr.io/<your-username>/llmaven-dashboard:latest
 ```
 
-### 3. Run dashboard locally (no Azure needed — uses demo data)
+### 3. Run dashboard locally (no Azure needed -- uses demo data)
 
 ```bash
 cd dashboard
@@ -115,10 +115,10 @@ streamlit run app.py
 
 ## Dashboard Features
 
-- **Model usage** — pie chart of which AI models are used (replicates Carlos's chart 1)
-- **Daily cost** — bar chart of spend over time
-- **Token distribution** — input vs output tokens (Carlos's chart 2)
-- **Turns per session** — histogram of conversation length (Carlos's chart 3)
-- **Source filter** — filter by Claude-Code / SafeMind / curl (exactly how Carlos isolated coding activity)
-- **Top users by cost** — who's spending the most
-- **Raw records table** — filterable data table
+- **Model usage** -- pie chart of which AI models are used
+- **Daily cost** -- area chart of spend over time
+- **Token distribution** -- input vs output tokens per session
+- **Turns per session** -- histogram of conversation length
+- **Source filter** -- filter by Claude-Code / SafeMind / curl
+- **Top users by cost** -- who is spending the most
+- **Raw records table** -- filterable clean data table

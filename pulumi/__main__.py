@@ -1,5 +1,5 @@
 """
-LLMaven Azure Pipeline — Pulumi Infrastructure
+LLMaven Azure Pipeline - Pulumi Infrastructure
 ================================================
 Architecture (cheapest viable setup for our data scale):
 
@@ -33,7 +33,7 @@ llmaven_api_key = config.get("llmaven_api_key") or ""  # eScience's master key
 
 # ── Resource Group ─────────────────────────────────────────────────────────────
 # A resource group is just a folder in Azure that holds all related resources.
-# Deleting the resource group deletes everything inside it — easy cleanup.
+# Deleting the resource group deletes everything inside it - easy cleanup.
 resource_group = resources.ResourceGroup(
     "llmaven-rg",
     location=location,
@@ -43,25 +43,25 @@ resource_group = resources.ResourceGroup(
 # ── STAGE 2: Azure Data Lake Storage Gen2 ─────────────────────────────────────
 # Why ADLS Gen2 over plain Blob Storage?
 #   • is_hns_enabled=True gives us a real folder hierarchy (not flat buckets)
-#   • Works natively with Synapse, Databricks, Azure ML — no extra connectors
+#   • Works natively with Synapse, Databricks, Azure ML - no extra connectors
 #   • Same price as Blob Storage (~$0.018/GB/month on Hot tier)
 #
 # Alternatives considered:
-#   • Azure Blob Storage       — no folder hierarchy, fine for simple use
-#   • Azure SQL Database       — $15/month minimum, overkill for raw files
-#   • Azure Table Storage      — too limited for nested JSON analytics
+#   • Azure Blob Storage       - no folder hierarchy, fine for simple use
+#   • Azure SQL Database       - $15/month minimum, overkill for raw files
+#   • Azure Table Storage      - too limited for nested JSON analytics
 data_lake = storage.StorageAccount(
     "llmavendatalake",
     resource_group_name=resource_group.name,
     location=resource_group.location,
-    sku=storage.SkuArgs(name=storage.SkuName.STANDARD_LRS),   # Locally redundant — cheapest, fine for demo
+    sku=storage.SkuArgs(name=storage.SkuName.STANDARD_LRS),   # Locally redundant - cheapest, fine for demo
     kind=storage.Kind.STORAGE_V2,
     is_hns_enabled=True,   # ← This is what makes it ADLS Gen2 (not plain Blob)
     access_tier=storage.AccessTier.HOT,  # Hot tier: instant access, low cost at our tiny scale
     tags={"role": "data-lake"},
 )
 
-# Raw container — stores original JSONL files exactly as extracted from LLMaven
+# Raw container - stores original JSONL files exactly as extracted from LLMaven
 raw_container = storage.BlobContainer(
     "raw",
     resource_group_name=resource_group.name,
@@ -69,7 +69,7 @@ raw_container = storage.BlobContainer(
     public_access=storage.PublicAccess.NONE,
 )
 
-# Clean container — stores processed Parquet files (flat rows, ready for dashboard)
+# Clean container - stores processed Parquet files (flat rows, ready for dashboard)
 clean_container = storage.BlobContainer(
     "clean",
     resource_group_name=resource_group.name,
@@ -93,15 +93,15 @@ data_lake_conn_str = pulumi.Output.all(data_lake.name, data_lake_keys).apply(
 
 # ── STAGE 1: Azure Function App (Ingestion + Processing) ──────────────────────
 # Why Azure Functions over Azure Data Factory?
-#   • ADF costs ~$1/1000 pipeline runs + compute — overkill for 30 runs/month
-#   • Azure Functions: 1M free executions/month — we use ~30
-#   • Our pipeline is just "run a Python script daily" — Functions are perfect for this
+#   • ADF costs ~$1/1000 pipeline runs + compute - overkill for 30 runs/month
+#   • Azure Functions: 1M free executions/month - we use ~30
+#   • Our pipeline is just "run a Python script daily" - Functions are perfect for this
 #   • No servers to manage, scales to zero automatically
 #
 # Alternatives considered:
-#   • Azure Data Factory    — enterprise grade, expensive, complex for our use case
-#   • Azure Logic Apps      — limited flexibility for custom Python code
-#   • Azure Databricks      — $0.40+/hour, massive overkill for KB-sized data
+#   • Azure Data Factory    - enterprise grade, expensive, complex for our use case
+#   • Azure Logic Apps      - limited flexibility for custom Python code
+#   • Azure Databricks      - $0.40+/hour, massive overkill for KB-sized data
 
 # Functions need their own dedicated storage account (Azure requirement)
 func_storage = storage.StorageAccount(
@@ -155,10 +155,10 @@ function_app = web.WebApp(
             web.NameValuePairArgs(name="FUNCTIONS_EXTENSION_VERSION",   value="~4"),
             web.NameValuePairArgs(name="FUNCTIONS_WORKER_RUNTIME",      value="python"),
             web.NameValuePairArgs(name="WEBSITE_RUN_FROM_PACKAGE",      value="1"),
-            # Our pipeline config — set these once you have Layomi's credentials
+            # Our pipeline config - set these once you have the LLMaven admin credentials
             web.NameValuePairArgs(name="LLMAVEN_URL",                   value=llmaven_url),
             web.NameValuePairArgs(name="LLMAVEN_API_KEY",               value=llmaven_api_key),
-            # Data Lake connection — where to upload extracted + cleaned files
+            # Data Lake connection - where to upload extracted + cleaned files
             web.NameValuePairArgs(name="DATA_LAKE_CONN_STR",            value=data_lake_conn_str),
             web.NameValuePairArgs(name="RAW_CONTAINER",                 value="raw"),
             web.NameValuePairArgs(name="CLEAN_CONTAINER",               value="clean"),
@@ -167,19 +167,19 @@ function_app = web.WebApp(
     tags={"role": "pipeline"},
 )
 
-# ── STAGE 5: Dashboard — Streamlit on Azure Container Apps ────────────────────
+# ── STAGE 5: Dashboard - Streamlit on Azure Container Apps ────────────────────
 # Why Streamlit on Container Apps over Power BI?
 #   • Power BI Pro = $10/user/month just to share dashboards with team
 #   • Streamlit: write Python → get a shareable web dashboard instantly
 #   • Container Apps scale to zero (min_replicas=0) → free when nobody is watching
-#   • Full control over charts, filtering, layout — no drag-and-drop limits
+#   • Full control over charts, filtering, layout - no drag-and-drop limits
 #
 # Alternatives considered:
-#   • Power BI              — great for large orgs, expensive per user for sharing
-#   • Azure Managed Grafana — $9/month, better for real-time metrics not batch analytics
-#   • Azure Static Web App  — needs separate backend API for data, more complex
+#   • Power BI              - great for large orgs, expensive per user for sharing
+#   • Azure Managed Grafana - $9/month, better for real-time metrics not batch analytics
+#   • Azure Static Web App  - needs separate backend API for data, more complex
 
-# Log Analytics Workspace — required by Container Apps for logging
+# Log Analytics Workspace - required by Container Apps for logging
 log_analytics = operationalinsights.Workspace(
     "llmaven-logs",
     resource_group_name=resource_group.name,
@@ -194,7 +194,7 @@ log_analytics_keys = operationalinsights.get_shared_keys_output(
     workspace_name=log_analytics.name,
 )
 
-# Container Apps Environment — the shared network/runtime for our containers
+# Container Apps Environment - the shared network/runtime for our containers
 container_env = app.ManagedEnvironment(
     "llmaven-container-env",
     resource_group_name=resource_group.name,
@@ -211,7 +211,7 @@ container_env = app.ManagedEnvironment(
 
 # Streamlit Dashboard Container App
 # Image: we build and push this from dashboard/Dockerfile
-# For demo: using a placeholder — replace with your actual image after building
+# For demo: using a placeholder - replace with your actual image after building
 dashboard = app.ContainerApp(
     "llmaven-dashboard",
     resource_group_name=resource_group.name,
@@ -231,7 +231,7 @@ dashboard = app.ContainerApp(
                 # Replace with your own image after: docker build + push to GHCR or ACR
                 image="ghcr.io/bhagyashreewagh/llmaven-dashboard:latest",
                 resources=app.ContainerResourcesArgs(
-                    cpu=0.5,        # Half a CPU core — plenty for Streamlit
+                    cpu=0.5,        # Half a CPU core - plenty for Streamlit
                     memory="1Gi",   # 1GB RAM
                 ),
                 env=[
@@ -248,7 +248,7 @@ dashboard = app.ContainerApp(
         ],
         scale=app.ScaleArgs(
             min_replicas=0,   # ← Scales to zero when nobody is using it (free when idle)
-            max_replicas=1,   # Max 1 instance — we don't need more for a small team dashboard
+            max_replicas=1,   # Max 1 instance - we don't need more for a small team dashboard
         ),
     ),
     tags={"role": "dashboard"},

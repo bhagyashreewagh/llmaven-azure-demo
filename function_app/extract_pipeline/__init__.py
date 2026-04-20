@@ -1,5 +1,5 @@
 """
-Azure Function — LLMaven Extract Pipeline
+Azure Function - LLMaven Extract Pipeline
 ==========================================
 Trigger: Timer (runs daily at midnight UTC)
 
@@ -10,11 +10,11 @@ What this does:
   4. Saves clean data as Parquet to Data Lake under clean/YYYY/MM/DD/
 
 Environment variables needed (set in Pulumi / Azure portal):
-  LLMAVEN_URL       — eScience's LLMaven server URL (e.g. https://llmaven.escience.uw.edu)
-  LLMAVEN_API_KEY   — master key to authenticate with LLMaven
-  DATA_LAKE_CONN_STR — Azure Data Lake connection string (auto-set by Pulumi)
-  RAW_CONTAINER     — "raw"
-  CLEAN_CONTAINER   — "clean"
+  LLMAVEN_URL       - eScience's LLMaven server URL (e.g. https://llmaven.escience.uw.edu)
+  LLMAVEN_API_KEY   - master key to authenticate with LLMaven
+  DATA_LAKE_CONN_STR - Azure Data Lake connection string (auto-set by Pulumi)
+  RAW_CONTAINER     - "raw"
+  CLEAN_CONTAINER   - "clean"
 """
 
 import os
@@ -42,7 +42,7 @@ def extract_pipeline(timer: func.TimerRequest) -> None:
     """Main pipeline: extract → upload raw → clean → upload clean"""
 
     if timer.past_due:
-        logging.warning("Timer is past due — running now to catch up.")
+        logging.warning("Timer is past due - running now to catch up.")
 
     # Always process yesterday (we want complete day's data)
     yesterday = datetime.now(timezone.utc) - timedelta(days=1)
@@ -77,7 +77,7 @@ def extract_pipeline(timer: func.TimerRequest) -> None:
     # Why Parquet over CSV?
     #   • 85% smaller file size (columnar compression)
     #   • 10x faster to query (only reads columns you need)
-    #   • Preserves types (int/float/datetime — no parsing needed later)
+    #   • Preserves types (int/float/datetime - no parsing needed later)
     clean_blob_path = _make_blob_path("clean", yesterday, f"llmaven_clean_{date_str}.parquet")
     parquet_buffer = io.BytesIO()
     clean_df.to_parquet(parquet_buffer, index=False, engine="pyarrow")
@@ -88,7 +88,7 @@ def extract_pipeline(timer: func.TimerRequest) -> None:
         content_type="application/octet-stream",
     )
     logging.info(f"Uploaded clean Parquet to {clean_blob_path}")
-    logging.info(f"Pipeline complete for {date_str} — {len(clean_df)} interactions processed.")
+    logging.info(f"Pipeline complete for {date_str} - {len(clean_df)} interactions processed.")
 
 
 def _extract_from_llmaven(date_str: str) -> str | None:
@@ -102,7 +102,7 @@ def _extract_from_llmaven(date_str: str) -> str | None:
 
     # ── Demo mode: no real LLMaven URL configured ─────────────────────────────
     if not llmaven_url:
-        logging.warning("LLMAVEN_URL not set — using demo test data.")
+        logging.warning("LLMAVEN_URL not set - using demo test data.")
         return _get_demo_data()
 
     # ── Real mode: call LLMaven extract endpoint ───────────────────────────────
@@ -219,7 +219,7 @@ def _make_blob_path(stage: str, date: datetime, filename: str) -> str:
     """
     Build a partitioned path for the Data Lake.
     e.g. raw/2026/03/28/litellm_spend_logs_2026-03-28.jsonl
-    Partitioning by year/month/day makes queries faster — only scan what you need.
+    Partitioning by year/month/day makes queries faster - only scan what you need.
     """
     return f"{stage}/{date.year:04d}/{date.month:02d}/{date.day:02d}/{filename}"
 
