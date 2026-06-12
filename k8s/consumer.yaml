@@ -1,0 +1,58 @@
+---
+# Kafka consumer deployment — reads llm.usage.raw and fans out to Redis + Azure Data Lake.
+# KEDA (keda-scaler.yaml) controls replica count based on consumer group lag.
+# Without KEDA, set replicas manually here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llmaven-consumer
+  namespace: llmaven
+  labels:
+    app: llmaven-consumer
+spec:
+  replicas: 1  # KEDA overrides this when installed
+  selector:
+    matchLabels:
+      app: llmaven-consumer
+  template:
+    metadata:
+      labels:
+        app: llmaven-consumer
+    spec:
+      containers:
+        - name: consumer
+          image: ghcr.io/bhagyashreewagh/llmaven-consumer:latest
+          command: ["python", "-m", "kafka.consumer"]
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka-service:9092"
+            - name: KAFKA_TOPIC
+              value: "llm.usage.raw"
+            - name: KAFKA_CONSUMER_GROUP
+              value: "llmaven-observability"
+            - name: REDIS_HOST
+              value: "redis-service"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: DATA_LAKE_CONN_STR
+              valueFrom:
+                secretKeyRef:
+                  name: llmaven-secrets
+                  key: data-lake-conn-str
+            - name: COLD_CONTAINER
+              value: "realtime-events"
+            - name: HOURLY_COST_ALERT_THRESHOLD
+              value: "5.0"
+            - name: ALERT_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: llmaven-secrets
+                  key: alert-webhook-url
+                  optional: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "300m"

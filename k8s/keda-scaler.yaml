@@ -1,0 +1,38 @@
+---
+# KEDA ScaledObject — scales the consumer deployment based on Kafka consumer group lag.
+#
+# How it works:
+#   KEDA watches the lag on the llm.usage.raw topic for the llmaven-observability group.
+#   When lag > lagThreshold per partition, it scales up. When lag clears, it scales back down.
+#   This means the consumer fleet automatically absorbs traffic spikes without manual intervention.
+#
+# Prerequisites:
+#   kubectl apply -f https://github.com/kedacore/keda/releases/download/v2.13.0/keda-2.13.0.yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: llmaven-consumer-scaler
+  namespace: llmaven
+spec:
+  scaleTargetRef:
+    name: llmaven-consumer
+
+  # Scale between 1 and 10 replicas
+  minReplicaCount: 1
+  maxReplicaCount: 10
+
+  # Wait 60s before scaling down to avoid thrashing under bursty traffic
+  cooldownPeriod: 60
+
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka-service:9092
+        consumerGroup: llmaven-observability
+        topic: llm.usage.raw
+
+        # Scale up when there are more than 50 unprocessed messages per partition
+        lagThreshold: "50"
+
+        # Use consumer group offset to measure lag (not end offset)
+        offsetResetPolicy: latest
